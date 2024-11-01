@@ -80,18 +80,25 @@ def concat_review(dp):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--category', type=str, help='Specific category to process (e.g., "Video Games"). If not specified, processes all categories.')
+    parser.add_argument('--category', type=str, default='Video_Games', 
+                       help='Specific category to process (default: Video_Games)')
+    parser.add_argument('--all-categories', action='store_true',
+                       help='Process all categories instead of just the default/specified category')
     args = parser.parse_args()
 
     all_categories = load_all_categories()
-    if args.category:
+    if not args.all_categories:
         # Case-insensitive search for better user experience
         matching_categories = [c for c in all_categories if c.lower() == args.category.lower()]
         if not matching_categories:
-            print("Available categories:")
+            print("\nAvailable categories:")
             print("\n".join(all_categories))
             raise ValueError(f"Category '{args.category}' not found in available categories")
         all_categories = matching_categories
+        print(f"\nProcessing single category: {matching_categories[0]}")
+    else:
+        print(f"\nProcessing all {len(all_categories)} categories:")
+        print("\n".join(f"- {category}" for category in all_categories))
 
     # Load item metadata
     for category in all_categories:
