@@ -1,10 +1,11 @@
 import random
 import pandas as pd
+import argparse
 from huggingface_hub import hf_hub_download
 from datasets import load_dataset
 
 
-num_workers = 64
+num_workers = 16
 valid_timestamp = 1628643414042
 downsampling_factor = 10
 all_cleaned_item_metadata = {}
@@ -78,7 +79,19 @@ def concat_review(dp):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--category', type=str, help='Specific category to process (e.g., "Video Games"). If not specified, processes all categories.')
+    args = parser.parse_args()
+
     all_categories = load_all_categories()
+    if args.category:
+        # Case-insensitive search for better user experience
+        matching_categories = [c for c in all_categories if c.lower() == args.category.lower()]
+        if not matching_categories:
+            print("Available categories:")
+            print("\n".join(all_categories))
+            raise ValueError(f"Category '{args.category}' not found in available categories")
+        all_categories = matching_categories
 
     # Load item metadata
     for category in all_categories:
@@ -86,7 +99,6 @@ if __name__ == '__main__':
             'McAuley-Lab/Amazon-Reviews-2023',
             f'raw_meta_{category}',
             split='full',
-            trust_remote_code=True
         )
         concat_meta_dataset = meta_dataset.map(
             concat_item_metadata,
@@ -110,7 +122,6 @@ if __name__ == '__main__':
             'McAuley-Lab/Amazon-Reviews-2023',
             f'raw_review_{category}',
             split='full',
-            trust_remote_code=True
         )
         concat_review_dataset = review_dataset.map(
             concat_review,

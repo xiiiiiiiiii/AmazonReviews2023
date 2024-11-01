@@ -23,17 +23,15 @@ from transformers.trainer_utils import (
     PredictionOutput,
     TrainOutput,
     default_compute_objective,
-    default_hp_space,
     set_seed,
     speed_metrics,
 )
-from transformers.file_utils import (
-    WEIGHTS_NAME,
+from transformers.utils import (
     is_apex_available,
     is_datasets_available,
-    is_in_notebook,
     is_torch_tpu_available,
 )
+from transformers.utils import WEIGHTS_NAME
 from transformers.trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -72,7 +70,6 @@ if version.parse(torch.__version__) >= version.parse("1.6"):
 if is_datasets_available():
     import datasets
 
-from transformers.trainer import _model_unwrap
 from transformers.optimization import Adafactor, AdamW, get_scheduler
 import copy
 # Set path to SentEval
@@ -88,7 +85,30 @@ from filelock import FileLock
 
 logger = logging.get_logger(__name__)
 
+def _model_unwrap(model):
+    """
+    Unwrap a model from a DataParallel or DistributedDataParallel wrapper if applicable.
+    """
+    if hasattr(model, "module"):
+        return model.module
+    return model
+
+def hp_params(trial):
+    return {k: v for k, v in trial.params.items() if not k.startswith("_")}
+
 class CLTrainer(Trainer):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add this attribute with a default value
+        self.sharded_dpp = False
+        # Add use_amp attribute initialization
+        self.use_amp = False
+        if getattr(self.args, "fp16", False):
+            if _is_native_amp_available:
+                self.use_amp = True
+            else:
+                self.use_apex = True
 
     def evaluate(
         self,
@@ -442,23 +462,19 @@ class CLTrainer(Trainer):
                     steps_in_epoch <= self.args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
-                    # Gradient clipping
+                    # Calculate gradient norm
+                    grad_norm = None
                     if self.args.max_grad_norm is not None and self.args.max_grad_norm > 0 and not self.deepspeed:
-                        # deepspeed does its own clipping
-
                         if self.use_amp:
                             # AMP: gradients need unscaling
                             self.scaler.unscale_(self.optimizer)
 
                         if hasattr(self.optimizer, "clip_grad_norm"):
                             # Some optimizers (like the sharded optimizer) have a specific way to do gradient clipping
-                            self.optimizer.clip_grad_norm(self.args.max_grad_norm)
+                            grad_norm = self.optimizer.clip_grad_norm(self.args.max_grad_norm)
                         else:
-                            # Revert to normal clipping otherwise, handling Apex or full precision
-                            torch.nn.utils.clip_grad_norm_(
-                                amp.master_params(self.optimizer) if self.use_apex else model.parameters(),
-                                self.args.max_grad_norm,
-                            )
+                            parameters = amp.master_params(self.optimizer) if self.use_apex else model.parameters()
+                            grad_norm = torch.nn.utils.clip_grad_norm_(parameters, self.args.max_grad_norm)
 
                     # Optimizer step
                     if is_torch_tpu_available():
@@ -476,8 +492,13 @@ class CLTrainer(Trainer):
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(self.args, self.state, self.control)
+                    self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval=None)
 
-                    self._maybe_log_save_evaluate(tr_loss, model, trial, epoch)
+                    self.log({
+                        "train_loss": tr_loss.item() / (step + 1),
+                        "learning_rate": self.lr_scheduler.get_last_lr()[0],
+                        "step": self.state.global_step
+                    })
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break

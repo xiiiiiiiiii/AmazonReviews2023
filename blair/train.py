@@ -33,11 +33,12 @@ from transformers import (
 from transformers.tokenization_utils_base import BatchEncoding, PaddingStrategy, PreTrainedTokenizerBase
 from transformers.trainer_utils import is_main_process
 from transformers.data.data_collator import DataCollatorForLanguageModeling
-from transformers.file_utils import cached_property, torch_required, is_torch_available, is_torch_tpu_available
+from transformers.utils import cached_property
+from transformers.utils import is_torch_xla_available, is_torch_tpu_available
 from simcse.models import RobertaForCL, BertForCL
 from simcse.trainers import CLTrainer
 
-local_rank = int(os.environ["LOCAL_RANK"])
+local_rank = int(os.environ.get("LOCAL_RANK", -1))
 
 logger = logging.getLogger(__name__)
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_MASKED_LM_MAPPING.keys())
@@ -198,8 +199,8 @@ class OurTrainingArguments(TrainingArguments):
     )
 
     @cached_property
-    @torch_required
     def _setup_devices(self) -> "torch.device":
+        self.distributed_state = None  # Initialize the distributed_state attribute
         logger.info("PyTorch: setting up devices")
         if self.no_cuda:
             device = torch.device("cpu")
@@ -209,31 +210,15 @@ class OurTrainingArguments(TrainingArguments):
             device = xm.xla_device()
             self._n_gpu = 0
         elif local_rank == -1:
-            # if n_gpu is > 1 we'll use nn.DataParallel.
-            # If you only want to use a specific subset of GPUs use `CUDA_VISIBLE_DEVICES=0`
-            # Explicitly set CUDA to the first (index 0) CUDA device, otherwise `set_device` will
-            # trigger an error that a device index is missing. Index 0 takes into account the
-            # GPUs available in the environment, so `CUDA_VISIBLE_DEVICES=1,2` with `cuda:0`
-            # will use the first GPU in that env, i.e. GPU#1
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-            # Sometimes the line in the postinit has not been run before we end up here, so just checking we're not at
-            # the default value.
             self._n_gpu = torch.cuda.device_count()
         else:
-            # Here, we'll use torch.distributed.
-            # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
-            #
-            # deepspeed performs its own DDP internally, and requires the program to be started with:
-            # deepspeed  ./program.py
-            # rather than:
-            # python -m torch.distributed.launch --nproc_per_node=2 ./program.py
+            # Here, we'll use torch.distributed with 'gloo' backend for Mac
             if self.deepspeed:
                 from .integrations import is_deepspeed_available
-
                 if not is_deepspeed_available():
                     raise ImportError("--deepspeed requires deepspeed: `pip install deepspeed`.")
                 import deepspeed
-
                 deepspeed.init_distributed()
             else:
                 torch.distributed.init_process_group(backend="nccl")
