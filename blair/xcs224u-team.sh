@@ -47,7 +47,7 @@ python train.py \
     --save_steps 10 \
     --logging_strategy steps \
     --logging_steps 10 \
-    --pooler_type cls \
+    --pooler_type avg \
     --overwrite_output_dir \
     --temp 0.05 \
     --do_train \
