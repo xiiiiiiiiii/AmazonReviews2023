@@ -35,7 +35,7 @@ from transformers.trainer_utils import is_main_process
 from transformers.data.data_collator import DataCollatorForLanguageModeling
 from transformers.utils import cached_property
 from transformers.utils import is_torch_xla_available, is_torch_tpu_available
-from simcse.models import RobertaForCL, BertForCL
+from simcse.models import RobertaForCL, BertForCL, LlamaForCL
 from simcse.trainers import CLTrainer
 
 local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -367,6 +367,19 @@ def main():
             if model_args.do_mlm:
                 pretrained_model = BertForPreTraining.from_pretrained(model_args.model_name_or_path)
                 model.lm_head.load_state_dict(pretrained_model.cls.predictions.state_dict())
+        elif 'meta-llama/Llama-3.2-1B' in model_args.model_name_or_path:
+            model = LlamaForCL(
+                model_path=model_args.model_name_or_path,
+                config=config,
+                cache_dir=model_args.cache_dir,
+                # revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+                model_args=model_args
+            )
+            if model_args.do_mlm:
+                raise ValueError("MLM is not supported for LLaMA models")
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
         else:
             raise NotImplementedError
     else:

@@ -1,3 +1,6 @@
+blair/data/*
+blair/Llama-3.2-1B/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -162,3 +165,5 @@ cython_debug/
 seq_rec_results/log_tensorboard/
 seq_rec_results/saved/
 seq_rec_results/dataset/processed/
+.DS_Store
+blair/clean_review_meta.tsv
