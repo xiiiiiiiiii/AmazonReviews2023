@@ -494,11 +494,15 @@ class CLTrainer(Trainer):
                     self.control = self.callback_handler.on_step_end(self.args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval=None)
 
+                    output_dir = f"{self.args.output_dir}/full_save/"
                     self.log({
                         "train_loss": tr_loss.item() / (step + 1),
                         "learning_rate": self.lr_scheduler.get_last_lr()[0],
-                        "step": self.state.global_step
+                        "step": self.state.global_step,
+                        "model_save_output_dir": output_dir
                     })
+                    if self.state.global_step % 50 == 0:
+                        self.save_model(output_dir=output_dir)  # Saves the tokenizer too for easy upload
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break

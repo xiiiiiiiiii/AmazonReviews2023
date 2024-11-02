@@ -1,5 +1,7 @@
 blair/data/*
 blair/Llama-3.2-1B/*
+blair/checkpoints/meta-llama/*
+blair/checkpoints/team-meta-llama/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

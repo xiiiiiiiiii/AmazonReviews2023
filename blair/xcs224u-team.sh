@@ -30,11 +30,13 @@ export OMP_NUM_THREADS=8
 #     --fp16 \
 #     "$@"
 
+# --model_name_or_path "./checkpoints/team-meta-llama/Llama-3.2-1B/full_save/" \
+
 # Use single GPU/CPU
 python train.py \
     --model_name_or_path "meta-llama/Llama-3.2-1B" \
     --train_file clean_review_meta.tsv \
-    --output_dir checkpoints/xcs224u-team \
+    --output_dir checkpoints/team-meta-llama/Llama-3.2-1B \
     --num_train_epochs 1 \
     --per_device_train_batch_size 10 \
     --learning_rate 5e-5 \
@@ -43,10 +45,7 @@ python train.py \
     --metric_for_best_model cl_loss \
     --load_best_model_at_end \
     --eval_steps 10 \
-    --save_strategy steps \
     --save_steps 10 \
-    --logging_strategy steps \
-    --logging_steps 10 \
     --pooler_type avg \
     --overwrite_output_dir \
     --temp 0.05 \

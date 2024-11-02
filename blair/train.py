@@ -368,14 +368,24 @@ def main():
                 pretrained_model = BertForPreTraining.from_pretrained(model_args.model_name_or_path)
                 model.lm_head.load_state_dict(pretrained_model.cls.predictions.state_dict())
         elif 'meta-llama/Llama-3.2-1B' in model_args.model_name_or_path:
-            model = LlamaForCL(
-                model_path=model_args.model_name_or_path,
-                config=config,
-                cache_dir=model_args.cache_dir,
-                # revision=model_args.model_revision,
-                use_auth_token=True if model_args.use_auth_token else None,
-                model_args=model_args
-            )
+            if 'checkpoints/' in model_args.model_name_or_path:
+                model = LlamaForCL.from_pretrained(
+                    pretrained_model_name_or_path=model_args.model_name_or_path,
+                    config=config,
+                    cache_dir=model_args.cache_dir,
+                    # revision=model_args.model_revision,
+                    use_auth_token=True if model_args.use_auth_token else None,
+                    model_args=model_args
+                )
+            else:
+                model = LlamaForCL(
+                    model_path=model_args.model_name_or_path,
+                    config=config,
+                    cache_dir=model_args.cache_dir,
+                    # revision=model_args.model_revision,
+                    use_auth_token=True if model_args.use_auth_token else None,
+                    model_args=model_args
+                )
             if model_args.do_mlm:
                 raise ValueError("MLM is not supported for LLaMA models")
             if tokenizer.pad_token is None:
