@@ -43,7 +43,10 @@ python train.py \
     --metric_for_best_model cl_loss \
     --load_best_model_at_end \
     --eval_steps 10 \
-    save_steps=10
+    --save_strategy steps \
+    --save_steps 10 \
+    --logging_strategy steps \
+    --logging_steps 10 \
     --pooler_type cls \
     --overwrite_output_dir \
     --temp 0.05 \
