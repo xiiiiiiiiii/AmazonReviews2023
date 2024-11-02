@@ -7,6 +7,7 @@ from typing import Optional, Union, List, Dict, Tuple
 import torch
 import collections
 import random
+import pyarrow.parquet as pq
 
 from datasets import load_dataset
 
@@ -286,6 +287,10 @@ def main():
     #
     # In distributed training, the load_dataset function guarantee that only one local process can concurrently
     # download the dataset.
+
+    test_id_df = pq.read_table('amazon_c4_w_product_metas-test.arrow')
+    test_ids_set = set([str(parent_asyn) for parent_asyn in test_id_df['item_id']])
+
     data_files = {}
     if data_args.train_file is not None:
         data_files["train"] = data_args.train_file
@@ -294,6 +299,15 @@ def main():
         extension = "text"
     if extension in ["csv", "tsv"]:
         datasets = load_dataset('csv', data_files=data_files, cache_dir="./data/", delimiter="\t" if "tsv" in data_args.train_file else ",", lineterminator='\n', on_bad_lines='skip')
+        initial_size = len(datasets['train'])
+        # Filter out test IDs
+        def filter_test_ids(example):
+            return str(example['parent_asin']) not in test_ids_set
+        datasets = datasets.filter(filter_test_ids)
+        without_test_set_size = len(datasets['train'])
+        logger.info(f"Initial rows: {initial_size}, after filtering: {without_test_set_size}, rows filtered out: {initial_size - without_test_set_size}")
+        # Select only two required columns for now.
+        datasets = datasets.select_columns(['review', 'meta'])
         if "validation" not in datasets.keys():
             datasets["validation"] = load_dataset(
                 'csv', data_files=data_files, cache_dir="./data/", delimiter="\t" if "tsv" in data_args.train_file else ",",

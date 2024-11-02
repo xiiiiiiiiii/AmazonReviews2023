@@ -124,6 +124,7 @@ if __name__ == '__main__':
     # Load reviews
     output_review = []
     output_metadata = []
+    parent_asins = []
     for category in all_categories:
         review_dataset = load_dataset(
             'McAuley-Lab/Amazon-Reviews-2023',
@@ -142,10 +143,12 @@ if __name__ == '__main__':
         output_metadata.extend(
             [all_cleaned_item_metadata[_] for _ in final_review_dataset['parent_asin']]
         )
+        parent_asins.extend(final_review_dataset['parent_asin'])
 
     # Save pretraining data
     df = pd.DataFrame({
         'review': output_review,
-        'meta': output_metadata
+        'meta': output_metadata,
+        'parent_asin': parent_asins
     })
     df.to_csv('clean_review_meta.tsv', sep='\t', lineterminator='\n', index=False)
