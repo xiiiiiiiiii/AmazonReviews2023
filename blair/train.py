@@ -289,7 +289,15 @@ def main():
     # download the dataset.
 
     test_id_df = pq.read_table('amazon_c4_w_product_metas-test.arrow')
-    test_ids_set = set([str(parent_asyn) for parent_asyn in test_id_df['item_id']])
+    val_id_df = pq.read_table('amazon_c4_w_product_metas-validation.arrow')
+    test_extra_id_df = pq.read_table('amazon_c4_w_product_metas_extra-test.arrow')
+    val_extra_id_df = pq.read_table('amazon_c4_w_product_metas_extra-validation.arrow')
+    val_test_ids_set = (
+        set([str(parent_asyn) for parent_asyn in test_id_df['parent_asin']])
+        | set([str(parent_asyn) for parent_asyn in val_id_df['parent_asin']])
+        | set([str(parent_asyn) for parent_asyn in test_extra_id_df['parent_asin']])
+        | set([str(parent_asyn) for parent_asyn in val_extra_id_df['parent_asin']])
+    )
 
     data_files = {}
     if data_args.train_file is not None:
@@ -301,9 +309,9 @@ def main():
         datasets = load_dataset('csv', data_files=data_files, cache_dir="./data/", delimiter="\t" if "tsv" in data_args.train_file else ",", lineterminator='\n', on_bad_lines='skip')
         initial_size = len(datasets['train'])
         # Filter out test IDs
-        def filter_test_ids(example):
-            return str(example['parent_asin']) not in test_ids_set
-        datasets = datasets.filter(filter_test_ids)
+        def filter_val_test_ids(example):
+            return str(example['parent_asin']) not in val_test_ids_set
+        datasets = datasets.filter(filter_val_test_ids)
         without_test_set_size = len(datasets['train'])
         logger.info(f"Initial rows: {initial_size}, after filtering: {without_test_set_size}, rows filtered out: {initial_size - without_test_set_size}")
         # Select only two required columns for now.
