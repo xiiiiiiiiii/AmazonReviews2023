@@ -203,6 +203,10 @@ class OurTrainingArguments(TrainingArguments):
     def _setup_devices(self) -> "torch.device":
         self.distributed_state = None  # Initialize the distributed_state attribute
         logger.info("PyTorch: setting up devices")
+        # if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        #     device = torch.device("mps") # Apple silicon gpu.
+        #     self._n_gpu = 1
+        # el
         if self.no_cuda:
             device = torch.device("cpu")
             self._n_gpu = 0
@@ -408,10 +412,10 @@ def main():
                     use_auth_token=True if model_args.use_auth_token else None,
                     model_args=model_args
                 )
-            if model_args.do_mlm:
-                raise ValueError("MLM is not supported for LLaMA models")
             if tokenizer.pad_token is None:
-                tokenizer.pad_token = tokenizer.eos_token
+                tokenizer.pad_token = '<|finetune_right_pad_id|>'
+            if tokenizer.mask_token is None:
+                tokenizer.mask_token = '<|reserved_special_token_1|>'  # No mask token in Llama.
         else:
             raise NotImplementedError
     else:

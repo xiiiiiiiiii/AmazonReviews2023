@@ -153,17 +153,28 @@ def cl_forward(cls,
     # MLM auxiliary objective
     if mlm_input_ids is not None:
         mlm_input_ids = mlm_input_ids.view((-1, mlm_input_ids.size(-1)))
-        mlm_outputs = encoder(
-            mlm_input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=True if cls.model_args.pooler_type in ['avg_top2', 'avg_first_last'] else False,
-            return_dict=True,
-        )
+        if is_llama:
+            outputs = encoder(
+                mlm_input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=True if cls.model_args.pooler_type in ['avg_top2', 'avg_first_last'] else False,
+                return_dict=True,
+            )
+        else:
+            mlm_outputs = encoder(
+                mlm_input_ids,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=True if cls.model_args.pooler_type in ['avg_top2', 'avg_first_last'] else False,
+                return_dict=True,
+            )
 
     # Pooling
     pooler_output = cls.pooler(attention_mask, outputs)
@@ -256,21 +267,33 @@ def sentemb_forward(
     output_attentions=None,
     output_hidden_states=None,
     return_dict=None,
+    is_llama=False
 ):
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
-    outputs = encoder(
-        input_ids,
-        attention_mask=attention_mask,
-        token_type_ids=token_type_ids,
-        position_ids=position_ids,
-        head_mask=head_mask,
-        inputs_embeds=inputs_embeds,
-        output_attentions=output_attentions,
-        output_hidden_states=True if cls.pooler_type in ['avg_top2', 'avg_first_last'] else False,
-        return_dict=True,
-    )
+    if is_llama:
+        outputs = encoder(
+            input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=True if cls.model_args.pooler_type in ['avg_top2', 'avg_first_last'] else False,
+            return_dict=True,
+        )
+    else:
+        outputs = encoder(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=True if cls.pooler_type in ['avg_top2', 'avg_first_last'] else False,
+            return_dict=True,
+        )
 
     pooler_output = cls.pooler(attention_mask, outputs)
     if cls.pooler_type == "cls" and not cls.model_args.mlp_only_train:
@@ -442,6 +465,7 @@ class LlamaForCL(LlamaPreTrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
+                is_llama=True,
             )
         else:
             return cl_forward(self, self.llama,

@@ -51,6 +51,6 @@ python train.py \
     --temp 0.05 \
     --do_train \
     --do_eval \
-    # --do_mlm \
+    --do_mlm \
     "$@"
     # --fp16 \
